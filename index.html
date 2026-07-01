@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Growth Architect — HubSpot System Architecture</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Tokens ──────────────────────────────────────── */
+    :root {
+      --white:   #FFFFFF;
+      --paper:   #F5F4F2;
+      --ink:     #111111;
+      --dark:    #1E1E1E;
+      --charcoal:#2D2D2D;
+      --mid:     #484848;
+      --muted:   #6A6A6A;
+      --light:   #E8E7E5;
+      --brass:   #FF8000;
+      --brass-dk:#CC6600;
+      --ease:    cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ── Reset ───────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html  { scroll-behavior: smooth; font-size: 16px; }
+    body  { font-family: 'Inter', system-ui, sans-serif; background: var(--white); color: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    img   { display: block; max-width: 100%; }
+    a     { color: inherit; text-decoration: none; }
+
+    /* ── Progress bar ────────────────────────────────── */
+    #progress {
+      position: fixed; top: 0; left: 0; height: 3px;
+      background: var(--brass); z-index: 300; width: 0%;
+      transition: width 0.08s linear;
+    }
+
+    /* ── Nav ─────────────────────────────────────────── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      height: 140px; padding: 12px 52px 0;
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background 0.35s ease, border-color 0.35s ease;
+      border-bottom: 1px solid transparent;
+    }
+    nav.scrolled-light {
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(12px);
+      border-color: rgba(0,0,0,0.08);
+    }
+    nav.scrolled-dark {
+      background: rgba(17,17,17,0.96);
+      backdrop-filter: blur(12px);
+      border-color: rgba(255,255,255,0.06);
+    }
+    .nav-logo { display: block; width: auto; filter: brightness(0) invert(1); transition: filter 0.3s; }
+    nav.scrolled-light .nav-logo { filter: brightness(0); }
+    .nav-links { display: flex; gap: 36px; }
+    .nav-links a { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.5); transition: color 0.2s; }
+    .nav-links a:hover { color: var(--white); }
+    nav.scrolled-light .nav-links a { color: var(--muted); }
+    nav.scrolled-light .nav-links a:hover { color: var(--ink); }
+    .nav-cta {
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      background: var(--brass); color: var(--ink);
+      padding: 9px 22px; border-radius: 2px;
+      transition: background 0.2s;
+    }
+    .nav-cta:hover { background: #E8622A; }
+
+    /* ── Scroll reveal ───────────────────────────────── */
+    .rev { opacity: 0; transform: translateY(24px); transition: opacity 0.75s var(--ease), transform 0.75s var(--ease); }
+    .rev.in { opacity: 1; transform: none; }
+    .rev-l { opacity: 0; transform: translateX(-24px); transition: opacity 0.75s var(--ease), transform 0.75s var(--ease); }
+    .rev-l.in { opacity: 1; transform: none; }
+    .rev-r { opacity: 0; transform: translateX(24px); transition: opacity 0.75s var(--ease), transform 0.75s var(--ease); }
+    .rev-r.in { opacity: 1; transform: none; }
+
+    /* ── Layout ──────────────────────────────────────── */
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 52px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; }
+
+    /* ── Type scale ──────────────────────────────────── */
+    .t-eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--brass);
+      display: flex; align-items: center; gap: 12px;
+    }
+    .t-eyebrow::after { content: ''; display: block; width: 36px; height: 1px; background: var(--brass); opacity: 0.5; }
+    .t-h1 { font-size: clamp(3.5rem, 9vw, 8rem); font-weight: 900; line-height: 0.96; letter-spacing: -0.035em; }
+    .t-h2 { font-size: clamp(2.2rem, 5vw, 4.5rem); font-weight: 800; line-height: 1.0; letter-spacing: -0.025em; }
+    .t-h3 { font-size: clamp(1.6rem, 3vw, 2.8rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
+    .t-h4 { font-size: 1.1rem; font-weight: 700; line-height: 1.2; }
+    .t-body { font-size: 15px; line-height: 1.8; color: var(--muted); }
+    .t-body-dark { font-size: 15px; line-height: 1.8; color: rgba(255,255,255,0.5); }
+    .t-small { font-size: 12px; letter-spacing: 0.06em; color: var(--muted); }
+
+    /* ── Buttons ─────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--ink); color: var(--white);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 15px 32px; border-radius: 2px; transition: background 0.2s, transform 0.2s;
+    }
+    .btn-primary:hover { background: var(--charcoal); transform: translateY(-2px); }
+    .btn-brass {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--brass); color: var(--ink);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 15px 32px; border-radius: 2px; transition: background 0.2s, transform 0.2s;
+    }
+    .btn-brass:hover { background: #E8622A; transform: translateY(-2px); }
+    .btn-outline {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1.5px solid var(--light); color: var(--ink);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 14px 32px; border-radius: 2px; transition: border-color 0.2s, background 0.2s;
+    }
+    .btn-outline:hover { border-color: var(--ink); background: rgba(0,0,0,0.03); }
+    .btn-outline-white {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 1.5px solid rgba(255,255,255,0.2); color: var(--white);
+      font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 14px 32px; border-radius: 2px; transition: border-color 0.2s;
+    }
+    .btn-outline-white:hover { border-color: rgba(255,255,255,0.7); }
+
+    /* ── Section rule ────────────────────────────────── */
+    .s-rule {
+      display: flex; align-items: center; gap: 16px;
+      font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--brass); margin-bottom: 56px;
+    }
+    .s-rule::before { content: ''; flex-shrink: 0; width: 28px; height: 1px; background: var(--brass); opacity: 0.5; }
+
+    /* ────────────────────────────────────────────────────
+       HERO
+    ──────────────────────────────────────────────────── */
+    #hero {
+      background: var(--white);
+      padding-top: 0; overflow: hidden;
+      position: relative;
+    }
+    /* ── Pinned hero ── */
+    #hero-pin { position: relative; height: 300vh; }
+    #hero {
+      position: sticky; top: 0;
+      height: 100vh; overflow: hidden;
+      background: #000;
+    }
+    /* Scale. overlay */
+    #scale-overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+    }
+    #scale-word {
+      font-family: var(--serif);
+      font-size: 13vw; font-weight: 700;
+      color: var(--brass);
+      display: inline-block;
+      transform: scale(1); transform-origin: center center;
+      will-change: transform;
+    }
+    /* Cityscape pinned to bottom of sticky hero */
+    #hero .cityscape-wrap {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 2;
+      background: transparent;
+    }
+
+    .hero-copy {
+      padding: 160px 52px 80px;
+      position: relative; z-index: 1;
+    }
+    .hero-copy .t-eyebrow { margin-bottom: 28px; }
+    .hero-copy .t-h1 { color: var(--ink); max-width: 880px; margin-bottom: 32px; }
+    .hero-copy .sub {
+      font-size: 17px; line-height: 1.75; color: var(--muted);
+      max-width: 480px; margin-bottom: 44px; font-weight: 400;
+    }
+    .hero-copy .btns { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 64px; }
+    .hero-clients {
+      display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+    }
+    .hero-clients .label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--light); flex-shrink: 0; }
+    .hero-clients span { font-size: 12px; font-weight: 600; color: var(--light); }
+
+    /* Scroll cue */
+    .scroll-cue {
+      position: absolute; bottom: 48px; left: 52px; z-index: 1;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
+      display: flex; align-items: center; gap: 14px;
+      animation: cue 2.5s ease-in-out infinite;
+      text-shadow: 0 1px 12px rgba(0,0,0,0.8);
+    }
+    .scroll-cue::before { content: ''; display: block; width: 2px; height: 48px; background: linear-gradient(to bottom, var(--brass), transparent); }
+    @keyframes cue { 0%,100%{opacity:0.7; transform:translateY(0)} 50%{opacity:1; transform:translateY(6px)} }
+
+    /* ────────────────────────────────────────────────────
+       CITYSCAPE SVG WRAPPER
+    ──────────────────────────────────────────────────── */
+    .cityscape-wrap {
+      position: relative;
+      margin-top: -2px;
+      line-height: 0;
+      overflow: hidden;
+      background: var(--ink);
+    }
+    .cityscape-wrap svg { width: 100%; display: block; }
+
+    /* Ambient float — each layer drifts at a different rate, creating depth */
+    /* Scroll-driven growth — JS sets scaleY, origin anchored to base of each layer */
+    #city-back, #city-mid, #city-front {
+      transform-box: fill-box;
+      transform-origin: bottom center;
+      will-change: transform;
+      transition: transform 0.05s linear;
+    }
+
+
+    /* ────────────────────────────────────────────────────
+       DARK BAND (stats bar)
+    ──────────────────────────────────────────────────── */
+    .stats-bar {
+      background: var(--ink); padding: 64px 0;
+    }
+    .stats-bar .wrap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+    .stat-item { text-align: center; padding: 0 20px; border-right: 1px solid rgba(255,255,255,0.07); }
+    .stat-item:last-child { border-right: none; }
+    .stat-num { font-size: clamp(2.5rem, 5vw, 3.8rem); font-weight: 900; letter-spacing: -0.03em; color: var(--white); line-height: 1; margin-bottom: 8px; }
+    .stat-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.3); }
+
+    /* ────────────────────────────────────────────────────
+       MANIFESTO (01)
+    ──────────────────────────────────────────────────── */
+    #s01 { background: var(--white); padding: 120px 0; }
+    .manifesto-quote {
+      font-size: clamp(1.4rem, 3vw, 2.4rem); font-weight: 300; font-style: italic;
+      line-height: 1.5; color: var(--ink); max-width: 640px;
+      border-left: 2px solid var(--brass); padding-left: 28px;
+    }
+
+    /* Image frame (brass corner marks) */
+    .framed-img { position: relative; display: inline-block; }
+    .framed-img img { width: 100%; border-radius: 2px; filter: grayscale(100%); }
+    .corner { position: absolute; width: 18px; height: 18px; }
+    .corner-tl { top: -8px; left: -8px; border-top: 2px solid var(--brass); border-left: 2px solid var(--brass); }
+    .corner-tr { top: -8px; right: -8px; border-top: 2px solid var(--brass); border-right: 2px solid var(--brass); }
+    .corner-bl { bottom: -8px; left: -8px; border-bottom: 2px solid var(--brass); border-left: 2px solid var(--brass); }
+    .corner-br { bottom: -8px; right: -8px; border-bottom: 2px solid var(--brass); border-right: 2px solid var(--brass); }
+
+    /* Three pillars */
+    .pillar { border-top: 2px solid var(--light); padding-top: 24px; }
+    .pillar-num { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); margin-bottom: 12px; }
+
+    /* S01 pin — 3 items, releases shortly after last item */
+    #s01-pin { position: relative; height: 210vh; }
+    #s01 { position: sticky; top: 0; overflow: hidden; }
+    .pillar-pin {
+      opacity: 0;
+      transform: translateY(28px);
+      transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1);
+    }
+    .pillar-pin.in { opacity: 1; transform: translateY(0); }
+
+    /* S03 pin — 5 items, releases shortly after last item */
+    #s03-pin { position: relative; height: 270vh; }
+    #s03 { position: sticky; top: 0; overflow: hidden; }
+    .svc-pin {
+      opacity: 0;
+      transform: translateY(22px);
+      transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1);
+    }
+    .svc-pin.in { opacity: 1; transform: translateY(0); }
+
+    /* ────────────────────────────────────────────────────
+       CHALLENGE (02)
+    ──────────────────────────────────────────────────── */
+    #s02 { background: var(--ink); padding: 120px 0; }
+    .pain-card {
+      padding: 36px; border: 1px solid rgba(255,255,255,0.07); border-radius: 2px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .pain-card:hover { border-color: rgba(255,122,89,0.35); background: rgba(255,122,89,0.03); }
+    .pain-big-num {
+      position: absolute; top: 8px; right: 16px;
+      font-size: 80px; font-weight: 900; color: rgba(255,255,255,0.03);
+      line-height: 1; letter-spacing: -0.04em; pointer-events: none;
+    }
+    .pain-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); margin-bottom: 14px; display: block; }
+    .pain-card h3 { font-size: 20px; font-weight: 700; color: var(--white); margin-bottom: 12px; line-height: 1.2; }
+    .pain-card p { font-size: 14px; line-height: 1.75; color: rgba(255,255,255,0.4); }
+
+    /* ────────────────────────────────────────────────────
+       SERVICES (03)
+    ──────────────────────────────────────────────────── */
+    #s03 { background: var(--paper); padding: 120px 0; }
+    .svc-row {
+      display: grid; grid-template-columns: 64px 1fr 1fr; gap: 0 0;
+      padding: 32px 0; border-bottom: 1px solid var(--light);
+      align-items: start; transition: background 0.2s, opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1);
+      cursor: default;
+    }
+    .svc-row:first-child { border-top: 1px solid var(--light); }
+    .svc-row:hover { background: rgba(0,0,0,0.02); }
+    .svc-n { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; color: var(--brass); padding-top: 4px; }
+    .svc-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); line-height: 1.1; padding-right: 40px; }
+    .svc-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--brass); display: block; margin-bottom: 8px; }
+    .svc-desc { font-size: 14px; line-height: 1.75; color: var(--muted); }
+
+    /* ────────────────────────────────────────────────────
+       WORK (04)
+    ──────────────────────────────────────────────────── */
+    #s04 { background: var(--ink); padding: 120px 0; }
+    .work-card { border-radius: 2px; overflow: hidden; background: var(--charcoal); }
+    .work-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; filter: grayscale(100%); opacity: 0.55; transition: opacity 0.4s ease, transform 0.6s var(--ease); display: block; }
+    .work-card:hover .work-img { opacity: 0.7; transform: scale(1.04); }
+    .work-body { padding: 24px; }
+    .work-sector { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); margin-bottom: 8px; display: block; }
+    .work-body h3 { font-size: 18px; font-weight: 700; color: var(--white); line-height: 1.2; margin-bottom: 8px; }
+    .work-body p { font-size: 13px; line-height: 1.7; color: rgba(255,255,255,0.4); }
+
+    /* ────────────────────────────────────────────────────
+       PROCESS (05)
+    ──────────────────────────────────────────────────── */
+    #s05 { background: var(--white); padding: 120px 0; }
+    .proc-step {
+      display: grid; grid-template-columns: 160px 1fr; gap: 0 56px;
+      padding: 52px 0; border-bottom: 1px solid var(--light); align-items: start;
+    }
+    .proc-step:first-child { border-top: 1px solid var(--light); }
+    .proc-left { position: sticky; top: 88px; }
+    .proc-big { font-size: 72px; font-weight: 900; color: var(--light); letter-spacing: -0.04em; line-height: 1; display: block; margin-bottom: 6px; }
+    .proc-label { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+    .proc-step h3 { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 16px; }
+    .proc-step p { font-size: 15px; line-height: 1.8; color: var(--muted); max-width: 500px; margin-bottom: 20px; }
+    .proc-tags { display: flex; gap: 10px; flex-wrap: wrap; }
+    .proc-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--light); padding: 5px 12px; border-radius: 2px; color: var(--muted); }
+
+    /* ────────────────────────────────────────────────────
+       TESTIMONIALS (06)
+    ──────────────────────────────────────────────────── */
+    #s06 { background: var(--charcoal); padding: 120px 0; }
+    .featured-q {
+      font-size: clamp(1.5rem, 3vw, 2.3rem); font-weight: 300;
+      font-style: italic; line-height: 1.45; color: var(--white);
+      max-width: 820px; margin: 0 auto;
+    }
+    .q-attr { display: flex; align-items: center; gap: 14px; justify-content: center; margin-top: 36px; }
+    .q-avatar { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,122,89,0.15); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--brass); flex-shrink: 0; border: 1px solid rgba(255,122,89,0.25); }
+    .q-name { font-size: 13px; font-weight: 600; color: var(--white); }
+    .q-role { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+    .mini-q { padding-top: 44px; border-top: 1px solid rgba(255,255,255,0.08); }
+    .mini-q blockquote { font-size: 14px; line-height: 1.75; font-style: italic; color: rgba(255,255,255,0.5); margin-bottom: 20px; }
+    .mini-q cite { font-style: normal; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); display: block; }
+    .mini-q .co { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 2px; }
+
+    /* ────────────────────────────────────────────────────
+       CTA (07) — with skyline divider above
+    ──────────────────────────────────────────────────── */
+    .cta-section { background: var(--ink); padding: 0; position: relative; }
+    .cta-inner { padding: 100px 52px 120px; }
+    .cta-inner .t-h2 { color: var(--white); margin-bottom: 24px; max-width: 560px; }
+    .cta-inner .t-body-dark { max-width: 440px; margin-bottom: 44px; }
+
+    /* ────────────────────────────────────────────────────
+       FAQ
+    ──────────────────────────────────────────────────── */
+    #faq { background: var(--paper); padding: 120px 0; }
+    details { border-bottom: 1px solid var(--light); }
+    details:first-of-type { border-top: 1px solid var(--light); }
+    summary { display: flex; justify-content: space-between; align-items: center; padding: 24px 0; cursor: pointer; list-style: none; }
+    summary::-webkit-details-marker { display: none; }
+    summary h3 { font-size: 15px; font-weight: 700; color: var(--ink); }
+    .faq-icon { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--light); display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+    details[open] .faq-icon { background: var(--brass); border-color: var(--brass); }
+    .faq-icon svg { width: 12px; height: 12px; stroke: var(--muted); }
+    details[open] .faq-icon svg { stroke: var(--ink); }
+    .faq-plus { display: block; } .faq-minus { display: none; }
+    details[open] .faq-plus { display: none; } details[open] .faq-minus { display: block; }
+    .faq-answer { padding: 0 0 28px; font-size: 14px; line-height: 1.8; color: var(--muted); max-width: 680px; }
+
+    /* ────────────────────────────────────────────────────
+       FOOTER
+    ──────────────────────────────────────────────────── */
+    footer { background: #0A0A0A; padding: 64px 52px 32px; }
+    .footer-grid { max-width: 1160px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 48px; margin-bottom: 48px; }
+    footer h4 { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 18px; }
+    footer ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    footer ul a { font-size: 13px; color: rgba(255,255,255,0.35); transition: color 0.2s; }
+    footer ul a:hover { color: rgba(255,255,255,0.8); }
+    .footer-desc { font-size: 13px; line-height: 1.8; color: rgba(255,255,255,0.25); max-width: 260px; margin-top: 10px; }
+    .footer-bottom { max-width: 1160px; margin: 0 auto; padding-top: 28px; border-top: 1px solid rgba(255,255,255,0.06); display: flex; justify-content: space-between; align-items: center; flex-wrap: gap; }
+    .footer-bottom p, .footer-bottom a { font-size: 11px; color: rgba(255,255,255,0.18); letter-spacing: 0.04em; }
+    .footer-bottom a { transition: color 0.2s; }
+    .footer-bottom a:hover { color: rgba(255,255,255,0.5); }
+
+    /* ── Responsive ───────────────────────────────────── */
+    @media (max-width: 860px) {
+      .wrap { padding: 0 24px; }
+      nav { padding: 0 24px; }
+      .hero-copy { padding: 120px 24px 60px; }
+      .grid2 { grid-template-columns: 1fr; gap: 40px; }
+      .grid3 { grid-template-columns: 1fr; }
+      .stats-bar .wrap { grid-template-columns: 1fr 1fr; gap: 24px; }
+      .stat-item { border-right: none; }
+      .svc-row { grid-template-columns: 44px 1fr; }
+      .svc-desc { grid-column: 2; margin-top: 12px; }
+      .proc-step { grid-template-columns: 1fr; gap: 20px; }
+      .proc-left { position: static; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .cta-inner { padding: 72px 24px; }
+      footer { padding: 48px 24px 24px; }
+      .scroll-cue { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="progress"></div>
+
+  <!-- ── Nav ──────────────────────────────────────────── -->
+  <nav id="main-nav">
+    <img src="logo.png" alt="The Growth Architect" class="nav-logo" style="height:140px; width:auto; display:block;"/>
+    <div class="nav-links">
+      <a href="#s03">Services</a>
+      <a href="#s04">Work</a>
+      <a href="#s05">Process</a>
+      <a href="#s06">Clients</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a href="#cta" class="nav-cta">Get In Touch</a>
+  </nav>
+
+
+  <!-- ══════════════════════════════════════════════════
+       HERO — pinned; "Scale." expands on scroll
+  ══════════════════════════════════════════════════ -->
+  <div id="hero-pin">
+  <section id="hero">
+
+    <!-- Background image -->
+    <div id="hero-parallax" style="position:absolute; inset:-30% -5%; background: url('hero-bg.png') center center / cover no-repeat; pointer-events:none; will-change:transform; z-index:0;"></div>
+    <div id="hero-darken" style="position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:1; transition:none;"></div>
+
+    <!-- Hero text — fades out as Scale. expands -->
+    <div id="hero-content" class="hero-copy" style="position:relative; z-index:3;">
+      <h1 class="t-h1 rev" style="color:var(--white); margin-bottom:28px; transition-delay:0.1s">
+        <span id="hero-pre">We Build<br>HubSpot Systems<br></span><span id="hero-that">That </span><span id="hero-scale-inline" style="color:var(--brass)">Scale.</span>
+      </h1>
+      <p class="sub rev" id="hero-sub" style="color:rgba(255,255,255,0.5); font-size:17px; line-height:1.75; max-width:480px; margin-bottom:44px; transition-delay:0.2s">
+        HubSpot architecture designed around your business — not bolted on to it. Strategy, structure, and execution for companies ready to grow.
+      </p>
+      <div class="btns rev" id="hero-btns" style="transition-delay:0.3s">
+        <a href="#s01" class="btn-brass">Explore our approach ↓</a>
+        <a href="#s04" class="btn-outline-white">See completed work</a>
+      </div>
+      <div class="hero-clients rev" id="hero-clients" style="transition-delay:0.4s">
+        <span class="label">Trusted by</span>
+        <span>ExpressVPN</span>
+        <span style="color:rgba(255,255,255,0.2)">·</span>
+        <span>Vistra</span>
+        <span style="color:rgba(255,255,255,0.2)">·</span>
+        <span>GBM</span>
+        <span style="color:rgba(255,255,255,0.2)">·</span>
+        <span>Fleetcheck</span>
+        <span style="color:rgba(255,255,255,0.2)">·</span>
+        <span>Dish'd</span>
+        <span style="color:rgba(255,255,255,0.2)">·</span>
+        <span>Kinly</span>
+      </div>
+    </div>
+
+    <!-- "Scale." word — expands to fill viewport -->
+    <div id="scale-overlay">
+      <span id="scale-word">Scale.</span>
+    </div>
+
+    <div class="scroll-cue" style="position:absolute; bottom:480px; left:50%; transform:translateX(-50%); z-index:3;">Scroll to explore</div>
+
+    <!-- CITYSCAPE — single SVG, three <g> layers animated independently -->
+    <div class="cityscape-wrap">
+      <svg viewBox="0 0 1440 390" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax slice">
+
+        <!-- BACK layer — slowest float -->
+        <g id="city-back">
+          <rect fill="#8C8C8C" x="0"    y="205" width="92"  height="185"/>
+          <rect fill="#8C8C8C" x="100"  y="148" width="52"  height="242"/>
+          <polygon fill="#8C8C8C" points="160,105 222,150 222,390 160,390"/>
+          <polygon fill="#6E6E6E" points="222,150 264,188 264,390 222,390"/>
+          <rect fill="#8C8C8C" x="272"  y="175" width="60"  height="215"/>
+          <rect fill="#8C8C8C" x="340"  y="118" width="72"  height="272"/>
+          <polygon fill="#8C8C8C" points="420,178 484,112 484,390 420,390"/>
+          <polygon fill="#6E6E6E" points="484,112 524,152 524,390 484,390"/>
+          <rect fill="#8C8C8C" x="532"  y="145" width="60"  height="245"/>
+          <rect fill="#8C8C8C" x="600"  y="218" width="122" height="172"/>
+          <rect fill="#8C8C8C" x="730"  y="135" width="55"  height="255"/>
+          <rect fill="#8C8C8C" x="793"  y="182" width="80"  height="208"/>
+          <polygon fill="#8C8C8C" points="881,88  946,135 946,390 881,390"/>
+          <polygon fill="#6E6E6E" points="946,135 988,172 988,390 946,390"/>
+          <rect fill="#8C8C8C" x="996"  y="145" width="48"  height="245"/>
+          <rect fill="#8C8C8C" x="1052" y="178" width="62"  height="212"/>
+          <rect fill="#8C8C8C" x="1122" y="125" width="68"  height="265"/>
+          <polygon fill="#8C8C8C" points="1198,175 1262,108 1262,390 1198,390"/>
+          <polygon fill="#6E6E6E" points="1262,108 1306,148 1306,390 1262,390"/>
+          <rect fill="#8C8C8C" x="1314" y="152" width="62"  height="238"/>
+          <rect fill="#8C8C8C" x="1385" y="132" width="55"  height="258"/>
+        </g>
+
+        <!-- MID layer — medium float -->
+        <g id="city-mid">
+          <rect fill="#484848" x="0"    y="242" width="130" height="148"/>
+          <polygon fill="#484848" points="138,165 200,208 200,390 138,390"/>
+          <polygon fill="#333333" points="200,208 238,246 238,390 200,390"/>
+          <rect fill="#484848" x="246"  y="210" width="88"  height="180"/>
+          <rect fill="#484848" x="342"  y="178" width="52"  height="212"/>
+          <polygon fill="#484848" points="402,190 468,128 468,390 402,390"/>
+          <polygon fill="#333333" points="468,128 510,168 510,390 468,390"/>
+          <rect fill="#484848" x="518"  y="202" width="78"  height="188"/>
+          <rect fill="#484848" x="604"  y="152" width="58"  height="238"/>
+          <rect fill="#484848" x="670"  y="175" width="78"  height="215"/>
+          <polygon fill="#484848" points="756,122 822,165 822,390 756,390"/>
+          <polygon fill="#333333" points="822,165 860,202 860,390 822,390"/>
+          <rect fill="#484848" x="868"  y="222" width="98"  height="168"/>
+          <polygon fill="#484848" points="974,192 1040,135 1040,390 974,390"/>
+          <polygon fill="#333333" points="1040,135 1082,175 1082,390 1040,390"/>
+          <rect fill="#484848" x="1090" y="185" width="75"  height="205"/>
+          <rect fill="#484848" x="1173" y="148" width="55"  height="242"/>
+          <rect fill="#484848" x="1236" y="202" width="72"  height="188"/>
+          <rect fill="#484848" x="1316" y="162" width="80"  height="228"/>
+          <polygon fill="#484848" points="1404,138 1440,175 1440,390 1404,390"/>
+        </g>
+
+        <!-- FRONT layer — fastest float -->
+        <g id="city-front">
+          <rect fill="#1E1E1E" x="0"    y="272" width="148" height="118"/>
+          <polygon fill="#1E1E1E" points="50,225 118,265 118,390 50,390"/>
+          <rect fill="#1E1E1E" x="162"  y="252" width="98"  height="138"/>
+          <rect fill="#1E1E1E" x="268"  y="210" width="65"  height="180"/>
+          <polygon fill="#1E1E1E" points="340,195 408,235 408,390 340,390"/>
+          <rect fill="#1E1E1E" x="415"  y="268" width="96"  height="122"/>
+          <rect fill="#1E1E1E" x="519"  y="242" width="82"  height="148"/>
+          <rect fill="#1E1E1E" x="609"  y="205" width="52"  height="185"/>
+          <polygon fill="#1E1E1E" points="668,258 742,198 742,390 668,390"/>
+          <rect fill="#1E1E1E" x="750"  y="255" width="122" height="135"/>
+          <polygon fill="#1E1E1E" points="880,208 946,252 946,390 880,390"/>
+          <rect fill="#1E1E1E" x="954"  y="278" width="82"  height="112"/>
+          <rect fill="#1E1E1E" x="1044" y="245" width="98"  height="145"/>
+          <polygon fill="#1E1E1E" points="1150,265 1220,200 1220,390 1150,390"/>
+          <rect fill="#1E1E1E" x="1228" y="258" width="88"  height="132"/>
+          <rect fill="#1E1E1E" x="1324" y="222" width="70"  height="168"/>
+          <rect fill="#1E1E1E" x="1402" y="242" width="38"  height="148"/>
+        </g>
+
+        <!-- Ground strip — static, never animates -->
+        <rect x="0" y="374" width="1440" height="16" fill="#111111"/>
+      </svg>
+    </div>
+
+  </section>
+  </div><!-- /hero-pin -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       STATS BAR
+  ══════════════════════════════════════════════════ -->
+  <div class="stats-bar">
+    <div class="wrap">
+      <div class="stat-item rev">
+        <div class="stat-num">50+</div>
+        <div class="stat-label">Businesses built for</div>
+      </div>
+      <div class="stat-item rev" style="transition-delay:.08s">
+        <div class="stat-num">3 yrs</div>
+        <div class="stat-label">Avg. client tenure</div>
+      </div>
+      <div class="stat-item rev" style="transition-delay:.16s">
+        <div class="stat-num">5</div>
+        <div class="stat-label">Service disciplines</div>
+      </div>
+      <div class="stat-item rev" style="transition-delay:.24s">
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Process-first approach</div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════════════
+       01  ARCHITECTURE / MANIFESTO
+  ══════════════════════════════════════════════════ -->
+  <div id="s01-pin">
+  <section id="s01">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev">01 — Architecture</div>
+
+      <div class="grid2" style="gap:80px; margin-bottom:96px;">
+        <div>
+          <h2 class="t-h3 rev" style="margin-bottom:32px;">
+            Every great system<br>begins with<br>
+            <span style="color:var(--brass)">the right blueprint.</span>
+          </h2>
+          <p class="t-body rev" style="transition-delay:.1s; margin-bottom:20px;">
+            We're not implementors. We're architects. Before we touch a single workflow or configure a single field, we map your business — the processes, the friction points, the gaps between where you are and where you need to be.
+          </p>
+          <p class="t-body rev" style="transition-delay:.2s;">
+            The result is a system that works with how your business actually operates. Not a template. Not a default install. Architecture built specifically for you.
+          </p>
+        </div>
+
+        <!-- City grows as you scroll through the section -->
+        <div style="display:flex; align-items:flex-end; height:100%; min-height:340px;">
+          <svg id="s01-city" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMax meet" style="width:100%; display:block;">
+            <!-- BACK -->
+            <g id="s01-city-b" style="transform-box:fill-box; transform-origin:bottom center; transform:scaleY(0);">
+              <rect fill="#C8C8C8" x="0"   y="180" width="55"  height="220"/>
+              <polygon fill="#C8C8C8" points="65,120 115,165 115,400 65,400"/>
+              <polygon fill="#B0B0B0" points="115,165 145,195 145,400 115,400"/>
+              <rect fill="#C8C8C8" x="153" y="150" width="50"  height="250"/>
+              <rect fill="#C8C8C8" x="210" y="100" width="65"  height="300"/>
+              <polygon fill="#C8C8C8" points="283,140 333,90  333,400 283,400"/>
+              <polygon fill="#B0B0B0" points="333,90  368,125 368,400 333,400"/>
+              <rect fill="#C8C8C8" x="376" y="160" width="48"  height="240"/>
+              <rect fill="#C8C8C8" x="432" y="115" width="60"  height="285"/>
+              <polygon fill="#C8C8C8" points="500,150 555,95  555,400 500,400"/>
+              <polygon fill="#B0B0B0" points="555,95  590,130 590,400 555,400"/>
+              <rect fill="#C8C8C8" x="0"   y="360" width="600" height="40"/>
+            </g>
+            <!-- MID -->
+            <g id="s01-city-m" style="transform-box:fill-box; transform-origin:bottom center; transform:scaleY(0);">
+              <rect fill="#787878" x="0"   y="230" width="75"  height="170"/>
+              <polygon fill="#787878" points="85,175 130,215 130,400 85,400"/>
+              <polygon fill="#606060" points="130,215 160,248 160,400 130,400"/>
+              <rect fill="#787878" x="168" y="195" width="60"  height="205"/>
+              <polygon fill="#787878" points="236,170 290,125 290,400 236,400"/>
+              <polygon fill="#606060" points="290,125 325,160 325,400 290,400"/>
+              <rect fill="#787878" x="333" y="210" width="55"  height="190"/>
+              <rect fill="#787878" x="396" y="160" width="72"  height="240"/>
+              <polygon fill="#787878" points="476,185 535,135 535,400 476,400"/>
+              <polygon fill="#606060" points="535,135 570,168 570,400 535,400"/>
+              <rect fill="#787878" x="0"   y="370" width="600" height="30"/>
+            </g>
+            <!-- FRONT -->
+            <g id="s01-city-f" style="transform-box:fill-box; transform-origin:bottom center; transform:scaleY(0);">
+              <rect fill="#1E1E1E" x="0"   y="278" width="90"  height="122"/>
+              <polygon fill="#1E1E1E" points="30,232 85,268 85,400 30,400"/>
+              <rect fill="#1E1E1E" x="100" y="252" width="75"  height="148"/>
+              <polygon fill="#1E1E1E" points="183,208 245,248 245,400 183,400"/>
+              <rect fill="#1E1E1E" x="253" y="272" width="68"  height="128"/>
+              <rect fill="#1E1E1E" x="329" y="235" width="58"  height="165"/>
+              <polygon fill="#1E1E1E" points="395,210 458,255 458,400 395,400"/>
+              <rect fill="#1E1E1E" x="466" y="265" width="80"  height="135"/>
+              <rect fill="#1E1E1E" x="554" y="248" width="46"  height="152"/>
+              <!-- Ground -->
+              <rect fill="#111111" x="0" y="384" width="600" height="16"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Three pillars — revealed one by one on scroll -->
+      <div class="grid3">
+        <div id="pillar-1" class="pillar pillar-pin">
+          <p class="pillar-num">We Map</p>
+          <h3 class="t-h4" style="margin-bottom:12px;">The Blueprint</h3>
+          <p class="t-body" style="font-size:14px;">Structured sessions to understand your business, your processes, and every friction point. Every decision comes from this foundation.</p>
+        </div>
+        <div id="pillar-2" class="pillar pillar-pin">
+          <p class="pillar-num">We Build</p>
+          <h3 class="t-h4" style="margin-bottom:12px;">The System</h3>
+          <p class="t-body" style="font-size:14px;">Implementation built around you — integrating seamlessly with how your team works today and where you're growing tomorrow.</p>
+        </div>
+        <div id="pillar-3" class="pillar pillar-pin">
+          <p class="pillar-num">We Scale</p>
+          <h3 class="t-h4" style="margin-bottom:12px;">The Growth</h3>
+          <p class="t-body" style="font-size:14px;">A system is never finished. We stay embedded — refining, evolving, and scaling your architecture as your business grows.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+  </div><!-- /s01-pin -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       02  THE CHALLENGE
+  ══════════════════════════════════════════════════ -->
+  <section id="s02">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev" style="color:var(--brass);">02 — The Challenge</div>
+
+      <div class="grid2" style="gap:80px; margin-bottom:72px;">
+        <h2 class="t-h2 rev" style="color:var(--white);">
+          Most businesses<br>buy HubSpot.<br>
+          <span style="color:var(--brass)">Few build a system.</span>
+        </h2>
+        <p class="t-body-dark rev" style="transition-delay:.15s;">
+          The platform is powerful. But without architecture — a system designed around how your business actually operates — it becomes another tool your team works around rather than with.
+        </p>
+      </div>
+
+      <div class="grid3">
+        <div class="pain-card rev">
+          <span class="pain-big-num">01</span>
+          <span class="pain-tag">Investment</span>
+          <h3>HubSpot isn't delivering ROI</h3>
+          <p>You're paying for a platform built for scale. Adoption is low, data is messy, and leadership doesn't trust what they see in the dashboards.</p>
+        </div>
+        <div class="pain-card rev" style="transition-delay:.1s;">
+          <span class="pain-big-num">02</span>
+          <span class="pain-tag">Integration</span>
+          <h3>Your systems don't talk to each other</h3>
+          <p>Sales, marketing, ops — three different views of the same data. Siloed information means slow decisions and missed opportunities every week.</p>
+        </div>
+        <div class="pain-card rev" style="transition-delay:.2s;">
+          <span class="pain-big-num">03</span>
+          <span class="pain-tag">Visibility</span>
+          <h3>Leadership can't see the full picture</h3>
+          <p>No real-time visibility across the customer journey. Reports take hours. You're making today's decisions on last week's data.</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       03  SERVICES / THE BLUEPRINT
+  ══════════════════════════════════════════════════ -->
+  <div id="s03-pin">
+  <section id="s03">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev" style="color:var(--brass);">03 — The Blueprint</div>
+
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:40px; margin-bottom:64px; flex-wrap:wrap;">
+        <h2 class="t-h2 rev" style="max-width:500px;">
+          Five disciplines.<br>
+          <span style="color:var(--brass)">One architecture.</span>
+        </h2>
+        <p class="t-body rev" style="max-width:360px; transition-delay:.15s;">
+          Each capability is designed to integrate with the others — a connected system, not a collection of separate engagements.
+        </p>
+      </div>
+
+      <div>
+        <div id="svc-1" class="svc-row svc-pin">
+          <span class="svc-n">01</span>
+          <div><span class="svc-tag">HubSpot</span><div class="svc-title">Get More Value from HubSpot</div></div>
+          <div><p class="svc-desc">We map your processes first, then build HubSpot around them. First-time adoption or a mature platform needing sharper edges — we make it genuinely high-impact.</p></div>
+        </div>
+        <div id="svc-2" class="svc-row svc-pin">
+          <span class="svc-n">02</span>
+          <div><span class="svc-tag">AI Strategy</span><div class="svc-title">Deploy AI That Actually Delivers</div></div>
+          <div><p class="svc-desc">From scattered experiments to a coordinated, scalable AI approach — integrated cleanly with HubSpot and your wider stack. Intelligence built in, not bolted on.</p></div>
+        </div>
+        <div id="svc-3" class="svc-row svc-pin">
+          <span class="svc-n">03</span>
+          <div><span class="svc-tag">RevOps</span><div class="svc-title">Align Revenue. Engineer Growth.</div></div>
+          <div><p class="svc-desc">We design RevOps systems at a strategic level — aligned with how your business actually operates, not a textbook framework your team has to conform to.</p></div>
+        </div>
+        <div id="svc-4" class="svc-row svc-pin">
+          <span class="svc-n">04</span>
+          <div><span class="svc-tag">Integrations</span><div class="svc-title">Connected Systems</div></div>
+          <div><p class="svc-desc">Custom software and integrations that eliminate operational friction — from HubSpot integrations to bespoke platforms and AI-powered automation middleware.</p></div>
+        </div>
+        <div id="svc-5" class="svc-row svc-pin">
+          <span class="svc-n">05</span>
+          <div><span class="svc-tag">Websites</span><div class="svc-title">Websites That Drive Growth</div></div>
+          <div><p class="svc-desc">Scalable, integrated platforms built to support marketing, sales, and customer experience from day one — not a brochure disconnected from your stack.</p></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+  </div><!-- /s03-pin -->
+
+
+  <!-- ══════════════════════════════════════════════════
+       04  COMPLETED WORKS
+  ══════════════════════════════════════════════════ -->
+  <section id="s04">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev" style="color:var(--brass);">04 — Completed Works</div>
+
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:40px; margin-bottom:64px; flex-wrap:wrap;">
+        <h2 class="t-h2 rev" style="color:var(--white); max-width:480px;">
+          What we've<br><span style="color:var(--brass)">built.</span>
+        </h2>
+        <p class="t-body-dark rev" style="max-width:340px; transition-delay:.15s;">
+          Connected ecosystems that give teams clarity, control, and the confidence to scale.
+        </p>
+      </div>
+
+      <div class="grid3">
+        <div class="work-card rev">
+          <img class="work-img"
+            src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=700&q=80"
+            alt="Financial analytics"
+          />
+          <div class="work-body">
+            <span class="work-sector">Financial Services · HubSpot + RevOps</span>
+            <h3>HubSpot as Single Source of Truth</h3>
+            <p>Integrated a complex multi-system environment into one hub — enriched data, automated workflows, real-time leadership insight.</p>
+          </div>
+        </div>
+        <div class="work-card rev" style="transition-delay:.1s;">
+          <img class="work-img"
+            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=700&q=80"
+            alt="Team collaboration"
+          />
+          <div class="work-body">
+            <span class="work-sector">Scale-up · Full RevOps Architecture</span>
+            <h3>Built for Growth from Day One</h3>
+            <p>Onboarded HubSpot at founding and evolved the system as the business grew — without a rebuild at any stage.</p>
+          </div>
+        </div>
+        <div class="work-card rev" style="transition-delay:.2s;">
+          <img class="work-img"
+            src="https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=700&q=80"
+            alt="Digital strategy"
+          />
+          <div class="work-body">
+            <span class="work-sector">Fitness & Wellness · Automation</span>
+            <h3>Zero-Touch Customer Onboarding</h3>
+            <p>A fully automated onboarding journey — from first contact to integrated member, with zero manual steps in between.</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       05  THE BUILD PROCESS
+  ══════════════════════════════════════════════════ -->
+  <section id="s05">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev">05 — The Build Process</div>
+
+      <div style="display:flex; align-items:baseline; justify-content:space-between; gap:40px; margin-bottom:72px; flex-wrap:wrap;">
+        <h2 class="t-h2 rev" style="max-width:460px;">
+          Three stages.<br><span style="color:var(--brass)">One system.</span>
+        </h2>
+        <p class="t-body rev" style="max-width:360px; transition-delay:.15s;">
+          Every engagement follows the same architecture — designed so you see value at every stage, not just at the end.
+        </p>
+      </div>
+
+      <div>
+        <div class="proc-step rev">
+          <div class="proc-left">
+            <span class="proc-big">01</span>
+            <span class="proc-label">Discovery</span>
+          </div>
+          <div>
+            <h3>Discover &amp; Define</h3>
+            <p>A 30-minute conversation to understand your business and map every process, friction point, and gap. We design the architecture before a single line is written. No pitch deck. No templates. Just an honest assessment.</p>
+            <div class="proc-tags">
+              <span class="proc-tag">Process Mapping</span>
+              <span class="proc-tag">Gap Analysis</span>
+              <span class="proc-tag">Architecture Brief</span>
+            </div>
+          </div>
+        </div>
+        <div class="proc-step rev">
+          <div class="proc-left">
+            <span class="proc-big">02</span>
+            <span class="proc-label">Design</span>
+          </div>
+          <div>
+            <h3>Design &amp; Scope</h3>
+            <p>We translate discovery into a custom architecture — a clear roadmap, an honest scope, a plan you understand before anything is built. Every decision is explained. Every cost is transparent. You approve the blueprint before we break ground.</p>
+            <div class="proc-tags">
+              <span class="proc-tag">System Design</span>
+              <span class="proc-tag">Roadmap</span>
+              <span class="proc-tag">Fixed Scope</span>
+            </div>
+          </div>
+        </div>
+        <div class="proc-step rev">
+          <div class="proc-left">
+            <span class="proc-big">03</span>
+            <span class="proc-label">Build &amp; Scale</span>
+          </div>
+          <div>
+            <h3>Build &amp; Scale</h3>
+            <p>We build with you, not at you. Implementation designed for adoption, with your team trained at every step. Then we stay — refining, evolving, scaling the architecture as your business grows. The best systems are lived in, not handed over.</p>
+            <div class="proc-tags">
+              <span class="proc-tag">Implementation</span>
+              <span class="proc-tag">Team Training</span>
+              <span class="proc-tag">Ongoing Support</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:64px; display:flex; gap:14px;" class="rev">
+        <a href="#cta" class="btn-primary">Start with a discovery call</a>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       06  TESTIMONIALS
+  ══════════════════════════════════════════════════ -->
+  <section id="s06">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev" style="color:var(--brass);">06 — Client Testimony</div>
+
+      <!-- Featured -->
+      <div style="text-align:center; margin-bottom:80px;">
+        <div style="width:36px; height:2px; background:var(--brass); margin:0 auto 32px;" class="rev"></div>
+        <blockquote class="featured-q rev" style="transition-delay:.1s;">
+          "An invaluable asset — I've worked with The Growth Architect for almost three years and I'd be lost without them. There is no challenge they're not willing to take on. Our CRM and integrations have made HubSpot our single point of truth, with much more enriched data."
+        </blockquote>
+        <div class="q-attr rev" style="transition-delay:.25s;">
+          <div class="q-avatar">RN</div>
+          <div style="text-align:left;">
+            <div class="q-name">Rosie Nixon</div>
+            <div class="q-role">Global Banking Markets</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Two mini -->
+      <div class="grid2" style="gap:64px; align-items:start;">
+        <div class="mini-q rev">
+          <blockquote>"A valued and expert partner from the infancy of our company. They onboarded HubSpot and provided a robust foundation. Trust, expertise and communication — we have all three."</blockquote>
+          <cite>Mohammed Rahman</cite>
+          <div class="co">Dish'd</div>
+        </div>
+        <div class="mini-q rev" style="transition-delay:.15s;">
+          <blockquote>"The Growth Architect have a way of making it very easy and never too much hassle. They have progressed our CRM to a slick system. Can't recommend them highly enough."</blockquote>
+          <cite>Ben Rean</cite>
+          <div class="co">CrossFit</div>
+        </div>
+      </div>
+
+      <!-- Stat strip -->
+      <div style="margin-top:96px; padding-top:60px; border-top:1px solid rgba(255,255,255,0.08); display:grid; grid-template-columns:repeat(3,1fr);" class="rev">
+        <div style="text-align:center; border-right:1px solid rgba(255,255,255,0.07); padding:0 20px;">
+          <div class="stat-num" style="color:var(--brass);">50+</div>
+          <div class="stat-label">Businesses built for</div>
+        </div>
+        <div style="text-align:center; border-right:1px solid rgba(255,255,255,0.07); padding:0 20px;">
+          <div class="stat-num" style="color:var(--brass);">3 yrs</div>
+          <div class="stat-label">Avg. client relationship</div>
+        </div>
+        <div style="text-align:center; padding:0 20px;">
+          <div class="stat-num" style="color:var(--brass);">100%</div>
+          <div class="stat-label">Process-first approach</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       FAQ
+  ══════════════════════════════════════════════════ -->
+  <section id="faq">
+    <div class="wrap" style="padding-top:120px; padding-bottom:120px;">
+
+      <div class="s-rule rev">FAQ</div>
+
+      <div style="display:flex; gap:80px; flex-wrap:wrap; justify-content:space-between; margin-bottom:48px;">
+        <h2 class="t-h3 rev" style="max-width:380px;">
+          Common<br><span style="color:var(--brass)">questions.</span>
+        </h2>
+      </div>
+
+      <div style="max-width:720px;">
+        <details class="rev">
+          <summary>
+            <h3>How long does a typical engagement take?</h3>
+            <div class="faq-icon">
+              <svg class="faq-plus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg class="faq-minus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </summary>
+          <p class="faq-answer">A typical initial engagement runs 6–12 weeks. We design projects to deliver real value early, so you see results before the engagement closes. Many clients then continue on a retainer as their system evolves with the business.</p>
+        </details>
+        <details class="rev">
+          <summary>
+            <h3>What does it cost to work with you?</h3>
+            <div class="faq-icon">
+              <svg class="faq-plus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg class="faq-minus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </summary>
+          <p class="faq-answer">Every project is scoped to your specific needs, so we don't publish fixed prices. We're completely transparent about cost before anything starts and design scopes to deliver a clear return on your investment.</p>
+        </details>
+        <details class="rev">
+          <summary>
+            <h3>Do we need to already be using HubSpot?</h3>
+            <div class="faq-icon">
+              <svg class="faq-plus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg class="faq-minus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </summary>
+          <p class="faq-answer">No. We work with businesses at every stage — companies adopting HubSpot for the first time, those who have it but aren't getting value, and mature platforms that need optimising. We always start by mapping your processes before touching any technology.</p>
+        </details>
+        <details class="rev">
+          <summary>
+            <h3>Will you work alongside our existing team?</h3>
+            <div class="faq-icon">
+              <svg class="faq-plus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg class="faq-minus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </summary>
+          <p class="faq-answer">Yes — and we teach your team as we build. We design systems with your people in mind, ensuring adoption isn't an afterthought. Many clients say the knowledge transfer is one of the most valuable parts of working with us.</p>
+        </details>
+        <details class="rev">
+          <summary>
+            <h3>How do we get started?</h3>
+            <div class="faq-icon">
+              <svg class="faq-plus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <svg class="faq-minus" viewBox="0 0 24 24" fill="none" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </div>
+          </summary>
+          <p class="faq-answer">Click "Get In Touch" and tell us briefly about your situation. We'll reply within one business day to arrange a free 30-minute discovery call. No commitment, no pitch deck — just a conversation to see if we're a good fit.</p>
+        </details>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       CTA — Skyline divider then dark section
+  ══════════════════════════════════════════════════ -->
+
+  <!-- Inverted cityscape (city below the CTA, paper bg above) -->
+  <div style="background:var(--paper); line-height:0; margin-bottom:-1px;">
+    <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" style="width:100%; display:block;">
+
+      <!-- ── BACK #8C8C8C / shadow #6E6E6E ── -->
+      <rect fill="#8C8C8C" x="0"    y="100" width="88"  height="100"/>
+      <rect fill="#8C8C8C" x="96"   y="72"  width="48"  height="128"/>
+      <polygon fill="#8C8C8C" points="152,48 210,78  210,192 152,192"/>
+      <polygon fill="#6E6E6E" points="210,78 248,110 248,192 210,192"/>
+      <rect fill="#8C8C8C" x="256"  y="82"  width="58"  height="110"/>
+      <rect fill="#8C8C8C" x="322"  y="55"  width="68"  height="137"/>
+      <polygon fill="#8C8C8C" points="398,88  458,50  458,192 398,192"/>
+      <polygon fill="#6E6E6E" points="458,50  496,82  496,192 458,192"/>
+      <rect fill="#8C8C8C" x="504"  y="68"  width="56"  height="124"/>
+      <rect fill="#8C8C8C" x="568"  y="108" width="115" height="84"/>
+      <rect fill="#8C8C8C" x="691"  y="62"  width="52"  height="130"/>
+      <rect fill="#8C8C8C" x="751"  y="88"  width="75"  height="104"/>
+      <polygon fill="#8C8C8C" points="834,40  894,65  894,192 834,192"/>
+      <polygon fill="#6E6E6E" points="894,65  932,95  932,192 894,192"/>
+      <rect fill="#8C8C8C" x="940"  y="70"  width="45"  height="122"/>
+      <rect fill="#8C8C8C" x="993"  y="58"  width="65"  height="134"/>
+      <polygon fill="#8C8C8C" points="1066,85 1128,48 1128,192 1066,192"/>
+      <polygon fill="#6E6E6E" points="1128,48 1168,80 1168,192 1128,192"/>
+      <rect fill="#8C8C8C" x="1176" y="72"  width="58"  height="120"/>
+      <rect fill="#8C8C8C" x="1242" y="55"  width="72"  height="137"/>
+      <polygon fill="#8C8C8C" points="1322,82 1388,42 1388,192 1322,192"/>
+      <polygon fill="#6E6E6E" points="1388,42 1440,78 1440,192 1388,192"/>
+
+      <!-- ── MID #484848 / shadow #333333 ── -->
+      <rect fill="#484848" x="0"    y="118" width="118" height="74"/>
+      <polygon fill="#484848" points="126,80  182,108 182,192 126,192"/>
+      <polygon fill="#333333" points="182,108 218,138 218,192 182,192"/>
+      <rect fill="#484848" x="226"  y="100" width="82"  height="92"/>
+      <rect fill="#484848" x="316"  y="82"  width="48"  height="110"/>
+      <polygon fill="#484848" points="372,95  432,58  432,192 372,192"/>
+      <polygon fill="#333333" points="432,58  472,90  472,192 432,192"/>
+      <rect fill="#484848" x="480"  y="98"  width="72"  height="94"/>
+      <rect fill="#484848" x="560"  y="72"  width="55"  height="120"/>
+      <rect fill="#484848" x="623"  y="85"  width="74"  height="107"/>
+      <polygon fill="#484848" points="705,58  765,82  765,192 705,192"/>
+      <polygon fill="#333333" points="765,82  802,112 802,192 765,192"/>
+      <rect fill="#484848" x="810"  y="108" width="88"  height="84"/>
+      <polygon fill="#484848" points="906,95  968,58  968,192 906,192"/>
+      <polygon fill="#333333" points="968,58  1008,90 1008,192 968,192"/>
+      <rect fill="#484848" x="1016" y="88"  width="70"  height="104"/>
+      <rect fill="#484848" x="1094" y="68"  width="52"  height="124"/>
+      <rect fill="#484848" x="1154" y="96"  width="68"  height="96"/>
+      <rect fill="#484848" x="1230" y="78"  width="76"  height="114"/>
+      <polygon fill="#484848" points="1314,65 1440,92 1440,192 1314,192"/>
+
+      <!-- ── FRONT #1E1E1E ── -->
+      <rect fill="#1E1E1E" x="0"    y="132" width="135" height="60"/>
+      <polygon fill="#1E1E1E" points="45,108 110,130 110,192 45,192"/>
+      <rect fill="#1E1E1E" x="148"  y="122" width="92"  height="70"/>
+      <rect fill="#1E1E1E" x="248"  y="102" width="58"  height="90"/>
+      <polygon fill="#1E1E1E" points="314,98  378,122 378,192 314,192"/>
+      <rect fill="#1E1E1E" x="386"  y="130" width="88"  height="62"/>
+      <polygon fill="#1E1E1E" points="482,100 548,128 548,192 482,192"/>
+      <rect fill="#1E1E1E" x="556"  y="120" width="75"  height="72"/>
+      <polygon fill="#1E1E1E" points="639,102 702,128 702,192 639,192"/>
+      <rect fill="#1E1E1E" x="710"  y="128" width="115" height="64"/>
+      <polygon fill="#1E1E1E" points="833,108 896,132 896,192 833,192"/>
+      <rect fill="#1E1E1E" x="904"  y="135" width="78"  height="57"/>
+      <polygon fill="#1E1E1E" points="990,95  1055,120 1055,192 990,192"/>
+      <rect fill="#1E1E1E" x="1063" y="120" width="88"  height="72"/>
+      <polygon fill="#1E1E1E" points="1159,100 1222,128 1222,192 1159,192"/>
+      <rect fill="#1E1E1E" x="1230" y="125" width="82"  height="67"/>
+      <rect fill="#1E1E1E" x="1320" y="108" width="120" height="84"/>
+
+      <!-- Base fill — eliminates any gap between buildings and CTA -->
+      <rect x="0" y="185" width="1440" height="15" fill="var(--ink)"/>
+    </svg>
+  </div>
+
+  <section id="cta" class="cta-section">
+    <div class="cta-inner">
+      <div class="s-rule rev" style="color:var(--brass); max-width:360px; margin-bottom:48px;">07 — Commission Your System</div>
+      <h2 class="t-h2 rev" style="color:var(--white); max-width:600px; transition-delay:.1s;">
+        Ready to commission<br>
+        <span style="color:var(--brass)">your architecture?</span>
+      </h2>
+      <p class="t-body-dark rev" style="margin-top:24px; margin-bottom:44px; transition-delay:.2s; max-width:440px;">
+        No templates. No guesswork. A system designed from the ground up around how your business operates — and built to scale with it.
+      </p>
+      <div class="rev" style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:24px; transition-delay:.3s;">
+        <a href="https://www.thegrowtharchitect.co.uk/" target="_blank" class="btn-brass">Set Up a Discovery Call</a>
+        <a href="https://www.thegrowtharchitect.co.uk/" target="_blank" class="btn-outline-white">Learn More</a>
+      </div>
+      <p class="rev" style="font-size:11px; color:rgba(255,255,255,0.25); letter-spacing:0.06em; transition-delay:.4s;">
+        We reply within 1 business day. No commitment required.
+      </p>
+    </div>
+  </section>
+
+
+  <!-- ══════════════════════════════════════════════════
+       FOOTER
+  ══════════════════════════════════════════════════ -->
+  <footer>
+    <div class="footer-grid">
+      <div>
+        <span style="font-size:12px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.4);">The Growth Architect</span>
+        <p class="footer-desc">HubSpot architecture for businesses ready to scale. We design systems that give your team clarity, control, and the confidence to grow.</p>
+      </div>
+      <div>
+        <h4>Disciplines</h4>
+        <ul>
+          <li><a href="#s03">HubSpot</a></li>
+          <li><a href="#s03">AI Strategy</a></li>
+          <li><a href="#s03">RevOps</a></li>
+          <li><a href="#s03">Integrations</a></li>
+          <li><a href="#s03">Websites</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#s04">Our Work</a></li>
+          <li><a href="#s05">How We Build</a></li>
+          <li><a href="#s06">Clients</a></li>
+          <li><a href="#cta">Get In Touch</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2026 TGA Consultancy Ltd trading as The Growth Architect</p>
+      <div style="display:flex; gap:28px;">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms &amp; Conditions</a>
+      </div>
+    </div>
+  </footer>
+
+
+  <script>
+    // Progress bar
+    const prog = document.getElementById('progress');
+    const nav  = document.getElementById('main-nav');
+    const heroBg = document.getElementById('hero-parallax');
+    const heroSection = document.getElementById('hero');
+
+    // Returns absolute top of element (pixels from document top)
+    function absTop(el) {
+      return el.getBoundingClientRect().top + window.pageYOffset;
+    }
+
+    let prevST = window.pageYOffset;
+
+    // ── Hero pin scroll animation ──
+    const heroPinEl   = document.getElementById('hero-pin');
+    const heroContent = document.getElementById('hero-content');
+    const heroPre     = document.getElementById('hero-pre');
+    const heroThat    = document.getElementById('hero-that');
+    const heroScaleInline = document.getElementById('hero-scale-inline');
+    const heroEyebrow = document.getElementById('hero-eyebrow');
+    const heroSub     = document.getElementById('hero-sub');
+    const heroBtns    = document.getElementById('hero-btns');
+    const heroClients = document.getElementById('hero-clients');
+    const scaleOverlay = document.getElementById('scale-overlay');
+    const scaleWordEl  = document.getElementById('scale-word');
+    const cityB = document.getElementById('city-back');
+    const cityM = document.getElementById('city-mid');
+    const cityF = document.getElementById('city-front');
+
+    // Start buildings as thin slivers
+    if (cityB) cityB.style.transform = 'scaleY(0.04)';
+    if (cityM) cityM.style.transform = 'scaleY(0.04)';
+    if (cityF) cityF.style.transform = 'scaleY(0.04)';
+
+    function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+    function progress(p, start, end) { return clamp((p - start) / (end - start), 0, 1); }
+
+    const heroDarken = document.getElementById('hero-darken');
+
+    function updateHeroPin() {
+      if (!heroPinEl) return;
+      const pinH = heroPinEl.offsetHeight - window.innerHeight;
+      const p = clamp(-heroPinEl.getBoundingClientRect().top / pinH, 0, 1);
+
+      // 0.00–0.20  everything visible, user reads
+      // 0.20–0.45  other text fades out
+      // 0.25–0.75  "Scale." overlay fades in & expands
+      // 0.75–0.90  "Scale." held at max
+      // 0.90–1.00  "Scale." fades out, city fully built
+
+      // Everything except "Scale." fades out first
+      const textFade = easeOut(progress(p, 0.20, 0.42));
+      const fadeEls  = [heroPre, heroThat, heroEyebrow, heroSub, heroBtns, heroClients];
+      fadeEls.forEach(el => { if (el) el.style.opacity = 1 - textFade; });
+
+      // "Scale." stays visible, then fades out on its own
+      if (scaleOverlay) scaleOverlay.style.opacity = 0;
+      const scaleFadeOut = easeOut(progress(p, 0.68, 0.88));
+      if (heroScaleInline) heroScaleInline.style.opacity = 1 - scaleFadeOut;
+
+      // City builds during 0.55–1.00
+      const cRaw = progress(p, 0.55, 1.00);
+      const pB = easeOut(progress(cRaw, 0.00, 0.60));
+      const pM = easeOut(progress(cRaw, 0.12, 0.75));
+      const pFr = easeOut(progress(cRaw, 0.25, 1.00));
+      if (cityB) cityB.style.transform = `scaleY(${(0.04 + pB  * 0.96).toFixed(4)})`;
+      if (cityM) cityM.style.transform = `scaleY(${(0.04 + pM  * 0.96).toFixed(4)})`;
+      if (cityF) cityF.style.transform = `scaleY(${(0.04 + pFr * 0.96).toFixed(4)})`;
+
+      // Image fades to black as city rises
+      if (heroDarken) heroDarken.style.opacity = easeOut(cRaw).toFixed(4);
+    }
+
+    function updateCityGrowth() {} // replaced by updateHeroPin
+
+    // ── S01 pin — pillars + city buildings on scroll ──
+    const s01PinEl  = document.getElementById('s01-pin');
+    const pillars   = [
+      document.getElementById('pillar-1'),
+      document.getElementById('pillar-2'),
+      document.getElementById('pillar-3')
+    ];
+    const pillarAt  = [0.18, 0.45, 0.72];
+    const s01CityB  = document.getElementById('s01-city-b');
+    const s01CityM  = document.getElementById('s01-city-m');
+    const s01CityF  = document.getElementById('s01-city-f');
+
+    // ── S03 pin — service rows reveal on scroll ──
+    const s03PinEl = document.getElementById('s03-pin');
+    const svcRows  = [1,2,3,4,5].map(n => document.getElementById('svc-'+n));
+    const svcAt    = [0.08, 0.22, 0.38, 0.54, 0.70];
+    let s03Done    = false;
+
+    function updateS03Pin() {
+      if (!s03PinEl || s03Done) return;
+      const pinH = s03PinEl.offsetHeight - window.innerHeight;
+      const p    = Math.max(0, Math.min(1, -s03PinEl.getBoundingClientRect().top / pinH));
+      svcRows.forEach((el, i) => { if (el && p >= svcAt[i]) el.classList.add('in'); });
+      if (p >= 0.82) s03Done = true;
+    }
+
+    let s01Done = false;
+
+    function updateS01Pin() {
+      if (!s01PinEl || s01Done) return;
+      const pinH = s01PinEl.offsetHeight - window.innerHeight;
+      const p    = Math.max(0, Math.min(1, -s01PinEl.getBoundingClientRect().top / pinH));
+
+      // Pillars
+      pillars.forEach((el, i) => { if (el && p >= pillarAt[i]) el.classList.add('in'); });
+
+      // Buildings grow in sync: back with pillar1, mid with pillar2, front with pillar3
+      if (s01CityB) s01CityB.style.transform = `scaleY(${easeOut(progress(p, 0.08, 0.38)).toFixed(4)})`;
+      if (s01CityM) s01CityM.style.transform = `scaleY(${easeOut(progress(p, 0.28, 0.58)).toFixed(4)})`;
+      if (s01CityF) s01CityF.style.transform = `scaleY(${easeOut(progress(p, 0.50, 0.82)).toFixed(4)})`;
+
+      // Lock buildings at full height once complete
+      if (p >= 0.88) {
+        if (s01CityB) s01CityB.style.transform = 'scaleY(1)';
+        if (s01CityM) s01CityM.style.transform = 'scaleY(1)';
+        if (s01CityF) s01CityF.style.transform = 'scaleY(1)';
+        s01Done = true;
+      }
+    }
+
+    // Skip a pin zone when animation is already done (both up and down)
+    function skipPinIfDone(st, goingUp) {
+      const pins = [
+        { el: s01PinEl, done: s01Done },
+        { el: s03PinEl, done: s03Done }
+      ];
+      for (const { el, done } of pins) {
+        if (!el || !done) continue;
+        const pinTop    = absTop(el);
+        const stickyEnd = pinTop + el.offsetHeight - window.innerHeight;
+        if (goingUp && prevST > stickyEnd && st <= stickyEnd) {
+          // Entering sticky zone from below going up — jump to top of pin
+          window.scrollTo({ top: pinTop - 2, behavior: 'instant' });
+          prevST = pinTop - 2;
+          return true;
+        }
+        if (!goingUp && prevST < pinTop && st >= pinTop) {
+          // Entering sticky zone from above going down — jump past pin
+          window.scrollTo({ top: stickyEnd + 2, behavior: 'instant' });
+          prevST = stickyEnd + 2;
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function onScroll() {
+      const st = window.scrollY;
+      const goingUp = st < prevST;
+
+      if (skipPinIfDone(st, goingUp)) return;
+      prevST = st;
+
+      const dh = document.documentElement.scrollHeight - window.innerHeight;
+      prog.style.width = (st / dh * 100) + '%';
+
+      // Hero pin + city growth
+      updateHeroPin();
+      // S01 pillar reveal
+      updateS01Pin();
+      // S03 service row reveal
+      updateS03Pin();
+
+      // Parallax: move the oversized bg div upward as user scrolls down
+      if (heroBg && heroSection) {
+        const heroH = heroSection.offsetHeight;
+        if (st < heroH) {
+          heroBg.style.transform = 'translateY(' + (st * 0.35) + 'px)';
+        }
+      }
+
+      // Nav theme: light until past hero dark panel, then sticky dark
+      const heroDark = document.querySelector('#hero > div:first-child');
+      const heroBottom = heroDark ? heroDark.getBoundingClientRect().bottom : 0;
+
+      nav.classList.remove('scrolled-light', 'scrolled-dark');
+      if (st > 20) {
+        if (heroBottom > 0) {
+          nav.classList.add('scrolled-dark');
+        } else {
+          nav.classList.add('scrolled-light');
+        }
+      }
+    }
+
+    // Scroll reveal
+    const allReveal = document.querySelectorAll('.rev, .rev-l, .rev-r');
+    const ro = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); ro.unobserve(e.target); } });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    allReveal.forEach(el => ro.observe(el));
+
+
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+  </script>
+</body>
+</html>
