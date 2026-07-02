@@ -27,7 +27,7 @@
 
     /* ── Reset ───────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html  { scroll-behavior: smooth; font-size: 16px; overflow-x: hidden; }
+    html  { scroll-behavior: smooth; font-size: 16px; }
     body  { font-family: 'Inter', system-ui, sans-serif; background: var(--white); color: var(--ink); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     img   { display: block; max-width: 100%; }
     a     { color: inherit; text-decoration: none; }
@@ -436,6 +436,12 @@
       #hero .cityscape-wrap svg { width: 100%; height: 100%; }
       #s01 .cityscape-wrap { height: 40vh; overflow: hidden; }
       #s01 .cityscape-wrap svg { width: 100%; height: 100%; }
+      /* s01 on mobile: release sticky pin, items fade in on scroll via IntersectionObserver */
+      #s01-pin { height: auto !important; }
+      #s01 { position: relative !important; top: auto !important; overflow: visible !important; }
+      .pillar-pin.mob-in { opacity: 1 !important; transform: translateY(0) !important; }
+      /* Show s01 city buildings at full height on mobile */
+      #s01-city-b, #s01-city-m, #s01-city-f { transform: scaleY(1) !important; }
     }
   </style>
 </head>
@@ -1388,6 +1394,14 @@
 
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
+
+    // On mobile: use IntersectionObserver to fade pillars in as they scroll into view
+    if (window.innerWidth <= 860) {
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('mob-in'); obs.unobserve(e.target); } });
+      }, { threshold: 0.2 });
+      document.querySelectorAll('.pillar-pin').forEach(el => obs.observe(el));
+    }
   </script>
 </body>
 </html>
