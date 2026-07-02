@@ -1341,35 +1341,8 @@
       }
     }
 
-    // Skip a pin zone when scrolling UP and animation is already done.
-    // On scroll-down we let the section scroll normally (all items stay visible).
-    function skipPinIfDone(st, goingUp) {
-      if (!goingUp) return false;
-      const pins = [
-        { el: s01PinEl, done: s01Done },
-        { el: s03PinEl, done: s03Done }
-      ];
-      for (const { el, done } of pins) {
-        if (!el || !done) continue;
-        const pinTop    = absTop(el);
-        const stickyEnd = pinTop + el.offsetHeight - window.innerHeight;
-        if (prevST > stickyEnd && st <= stickyEnd) {
-          // Entering sticky zone from below going up — jump to top of pin
-          window.scrollTo({ top: pinTop - 2, behavior: 'instant' });
-          prevST = pinTop - 2;
-          return true;
-        }
-      }
-      return false;
-    }
-
     function onScroll() {
       const st = window.scrollY;
-      // Use an 8px dead zone so mobile touch micro-oscillations don't
-      // trigger the skip logic and cause a jump.
-      const goingUp = st < prevST - 8;
-
-      if (skipPinIfDone(st, goingUp)) return;
       prevST = st;
 
       const dh = document.documentElement.scrollHeight - window.innerHeight;
