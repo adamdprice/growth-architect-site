@@ -424,9 +424,12 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
-      /* Cityscape — clip wrapper height on mobile, animation still runs normally */
-      #hero .cityscape-wrap { height: 100px; overflow: hidden; }
-      #s01 .cityscape-wrap { height: 80px; overflow: hidden; }
+      /* On mobile: make hero cityscape fill most of the screen height.
+         preserveAspectRatio="xMidYMax slice" zooms in, giving fewer, taller, wider buildings. */
+      #hero .cityscape-wrap { height: 60vh; overflow: hidden; }
+      #hero .cityscape-wrap svg { width: 100%; height: 100%; }
+      #s01 .cityscape-wrap { height: 40vh; overflow: hidden; }
+      #s01 .cityscape-wrap svg { width: 100%; height: 100%; }
     }
   </style>
 </head>
