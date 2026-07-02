@@ -424,10 +424,10 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
-      /* Cityscape — clip to compact strip on mobile */
-      #hero .cityscape-wrap { max-height: 90px; overflow: hidden; }
-      .cta-city-wrap { max-height: 80px; overflow: hidden; }
-      .s01-city-wrap { max-height: 70px; overflow: hidden; }
+      /* Cityscape — scale down to compact strip on mobile */
+      #hero .cityscape-wrap { transform: scaleY(0.45); transform-origin: bottom center; }
+      .cta-city-wrap svg { transform: scaleY(0.45); transform-origin: bottom center; display: block; }
+      #s01 .cityscape-wrap { transform: scaleY(0.45); transform-origin: bottom center; }
     }
   </style>
 </head>
