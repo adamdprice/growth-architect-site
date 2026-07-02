@@ -430,6 +430,9 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
+      /* Prevent horizontal overflow from slide-in animations on mobile */
+      .rev-l { transform: translateY(24px); }
+      .rev-r { transform: translateY(24px); }
       /* On mobile: make hero cityscape fill most of the screen height.
          preserveAspectRatio="xMidYMax slice" zooms in, giving fewer, taller, wider buildings. */
       #hero .cityscape-wrap { height: 60vh; overflow: hidden; }
