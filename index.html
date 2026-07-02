@@ -1347,7 +1347,9 @@
 
     function onScroll() {
       const st = window.scrollY;
-      const goingUp = st < prevST;
+      // Use an 8px dead zone so mobile touch micro-oscillations don't
+      // trigger the skip logic and cause a jump.
+      const goingUp = st < prevST - 8;
 
       if (skipPinIfDone(st, goingUp)) return;
       prevST = st;
