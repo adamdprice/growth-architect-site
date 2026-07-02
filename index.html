@@ -411,7 +411,12 @@
       .grid3 { grid-template-columns: 1fr; }
       .stats-bar .wrap { grid-template-columns: 1fr 1fr; gap: 24px; }
       .stat-item { border-right: none; }
-      .svc-row { grid-template-columns: 44px 1fr; }
+      .svc-row { display: block; padding: 24px 0; }
+      .svc-row .svc-n { display: inline-block; margin-right: 10px; vertical-align: middle; }
+      .svc-row .svc-tag { display: inline-block; margin-bottom: 10px; }
+      .svc-row > div:last-child { margin-top: 8px; }
+      .svc-title { font-size: 20px; padding-right: 0; }
+      .svc-desc { font-size: 14px; }
       .svc-desc { grid-column: 2; margin-top: 12px; }
       .proc-step { grid-template-columns: 1fr; gap: 20px; }
       .proc-left { position: static; }
