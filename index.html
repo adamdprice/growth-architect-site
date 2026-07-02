@@ -424,11 +424,9 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
-      /* Cityscape — on mobile, force buildings fully visible and clipped to a compact strip */
-      #city-back, #city-mid, #city-front { transform: scaleY(1) !important; }
-      #hero .cityscape-wrap { max-height: 120px; overflow: hidden; }
-      #s01-city-b, #s01-city-m, #s01-city-f { transform: scaleY(1) !important; }
-      #s01 .cityscape-wrap { max-height: 100px; overflow: hidden; }
+      /* Cityscape — clip wrapper height on mobile, animation still runs normally */
+      #hero .cityscape-wrap { height: 100px; overflow: hidden; }
+      #s01 .cityscape-wrap { height: 80px; overflow: hidden; }
     }
   </style>
 </head>
