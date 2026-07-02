@@ -424,6 +424,10 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
+      /* Cityscape — clip to compact strip on mobile */
+      #hero .cityscape-wrap { max-height: 90px; overflow: hidden; }
+      .cta-city-wrap { max-height: 80px; overflow: hidden; }
+      .s01-city-wrap { max-height: 70px; overflow: hidden; }
     }
   </style>
 </head>
@@ -1053,7 +1057,7 @@
   ══════════════════════════════════════════════════ -->
 
   <!-- Inverted cityscape (city below the CTA, paper bg above) -->
-  <div style="background:var(--paper); line-height:0; margin-bottom:-1px;">
+  <div class="cta-city-wrap" style="background:var(--paper); line-height:0; margin-bottom:-1px;">
     <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" style="width:100%; display:block;">
 
       <!-- ── BACK #8C8C8C / shadow #6E6E6E ── -->
