@@ -424,11 +424,11 @@
       .cta-inner { padding: 72px 24px; }
       footer { padding: 48px 24px 24px; }
       .scroll-cue { display: none; }
-      /* Cityscape — compact strip on mobile */
-      #hero .cityscape-wrap { transform: scaleY(0.6); transform-origin: bottom center; }
-      #s01 .cityscape-wrap { transform: scaleY(0.6); transform-origin: bottom center; }
-      .cta-city-wrap { height: 80px; overflow: hidden; background: transparent; }
-      .cta-city-wrap svg { position: absolute; bottom: 0; left: 0; width: 100%; }
+      /* Cityscape — on mobile, force buildings fully visible and clipped to a compact strip */
+      #city-back, #city-mid, #city-front { transform: scaleY(1) !important; }
+      #hero .cityscape-wrap { max-height: 120px; overflow: hidden; }
+      #s01-city-b, #s01-city-m, #s01-city-f { transform: scaleY(1) !important; }
+      #s01 .cityscape-wrap { max-height: 100px; overflow: hidden; }
     }
   </style>
 </head>
@@ -1058,7 +1058,7 @@
   ══════════════════════════════════════════════════ -->
 
   <!-- Inverted cityscape (city below the CTA, paper bg above) -->
-  <div class="cta-city-wrap" style="background:var(--paper); line-height:0; margin-bottom:-1px; position:relative;">
+  <div class="cta-city-wrap" style="background:var(--paper); line-height:0; margin-bottom:-2px; position:relative; overflow:hidden;">
     <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" style="width:100%; display:block;">
 
       <!-- ── BACK #8C8C8C / shadow #6E6E6E ── -->
