@@ -447,7 +447,7 @@
   <section id="hero">
 
     <!-- Background image -->
-    <div id="hero-parallax" style="position:absolute; inset:-30% -5%; background: url('hero-bg.png') center center / cover no-repeat; pointer-events:none; will-change:transform; z-index:0;"></div>
+    <div id="hero-parallax" style="position:absolute; inset:-30% -5%; background: url('hero-bg.png') center center / cover no-repeat; pointer-events:none; will-change:transform; z-index:0; transform:translateY(60px);"></div>
     <div id="hero-darken" style="position:absolute; inset:0; background:#000; opacity:0; pointer-events:none; z-index:1; transition:none;"></div>
 
     <!-- Hero text — fades out as Scale. expands -->
@@ -1355,7 +1355,7 @@
       if (heroBg && heroSection) {
         const heroH = heroSection.offsetHeight;
         if (st < heroH) {
-          heroBg.style.transform = 'translateY(' + (st * 0.35) + 'px)';
+          heroBg.style.transform = 'translateY(' + (60 - st * 0.35) + 'px)';
         }
       }
 
