@@ -1294,9 +1294,14 @@
     let s03Done    = false;
 
     function updateS03Pin() {
-      if (!s03PinEl || s03Done) return;
+      if (!s03PinEl) return;
       const pinH = s03PinEl.offsetHeight - window.innerHeight;
       const p    = Math.max(0, Math.min(1, -s03PinEl.getBoundingClientRect().top / pinH));
+      if (s03Done) {
+        // Re-apply final state every frame to prevent flash-to-invisible
+        svcRows.forEach(el => { if (el) { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; } });
+        return;
+      }
       svcRows.forEach((el, i) => { if (el && p >= svcAt[i]) el.classList.add('in'); });
       if (p >= 0.82) {
         document.getElementById('s03').classList.add('s03-complete');
@@ -1307,9 +1312,17 @@
     let s01Done = false;
 
     function updateS01Pin() {
-      if (!s01PinEl || s01Done) return;
+      if (!s01PinEl) return;
       const pinH = s01PinEl.offsetHeight - window.innerHeight;
       const p    = Math.max(0, Math.min(1, -s01PinEl.getBoundingClientRect().top / pinH));
+
+      if (s01Done) {
+        // Re-apply final state every frame to prevent flash-to-invisible
+        if (s01CityB) s01CityB.style.transform = 'scaleY(1)';
+        if (s01CityM) s01CityM.style.transform = 'scaleY(1)';
+        if (s01CityF) s01CityF.style.transform = 'scaleY(1)';
+        return;
+      }
 
       // Pillars
       pillars.forEach((el, i) => { if (el && p >= pillarAt[i]) el.classList.add('in'); });
@@ -1319,7 +1332,6 @@
       if (s01CityM) s01CityM.style.transform = `scaleY(${easeOut(progress(p, 0.28, 0.58)).toFixed(4)})`;
       if (s01CityF) s01CityF.style.transform = `scaleY(${easeOut(progress(p, 0.50, 0.82)).toFixed(4)})`;
 
-      // Lock buildings at full height once complete
       if (p >= 0.88) {
         if (s01CityB) s01CityB.style.transform = 'scaleY(1)';
         if (s01CityM) s01CityM.style.transform = 'scaleY(1)';
