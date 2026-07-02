@@ -1319,8 +1319,10 @@
       }
     }
 
-    // Skip a pin zone when animation is already done (both up and down)
+    // Skip a pin zone when scrolling UP and animation is already done.
+    // On scroll-down we let the section scroll normally (all items stay visible).
     function skipPinIfDone(st, goingUp) {
+      if (!goingUp) return false;
       const pins = [
         { el: s01PinEl, done: s01Done },
         { el: s03PinEl, done: s03Done }
@@ -1329,16 +1331,10 @@
         if (!el || !done) continue;
         const pinTop    = absTop(el);
         const stickyEnd = pinTop + el.offsetHeight - window.innerHeight;
-        if (goingUp && prevST > stickyEnd && st <= stickyEnd) {
+        if (prevST > stickyEnd && st <= stickyEnd) {
           // Entering sticky zone from below going up — jump to top of pin
           window.scrollTo({ top: pinTop - 2, behavior: 'instant' });
           prevST = pinTop - 2;
-          return true;
-        }
-        if (!goingUp && prevST < pinTop && st >= pinTop) {
-          // Entering sticky zone from above going down — jump past pin
-          window.scrollTo({ top: stickyEnd + 2, behavior: 'instant' });
-          prevST = stickyEnd + 2;
           return true;
         }
       }
