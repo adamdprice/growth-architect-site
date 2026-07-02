@@ -268,6 +268,11 @@
       transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1);
     }
     .pillar-pin.in { opacity: 1; transform: translateY(0); }
+    /* Once animation completes, CSS hard-locks final state so nothing can flash it back */
+    .s01-complete #s01-city-b,
+    .s01-complete #s01-city-m,
+    .s01-complete #s01-city-f { transform: scaleY(1) !important; }
+    .s01-complete .pillar-pin { opacity: 1 !important; transform: translateY(0) !important; }
 
     /* S03 pin — 5 items, releases shortly after last item */
     #s03-pin { position: relative; height: 270vh; }
@@ -278,6 +283,7 @@
       transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16,1,0.3,1);
     }
     .svc-pin.in { opacity: 1; transform: translateY(0); }
+    .s03-complete .svc-pin { opacity: 1 !important; transform: translateY(0) !important; }
 
     /* ────────────────────────────────────────────────────
        CHALLENGE (02)
@@ -1292,7 +1298,10 @@
       const pinH = s03PinEl.offsetHeight - window.innerHeight;
       const p    = Math.max(0, Math.min(1, -s03PinEl.getBoundingClientRect().top / pinH));
       svcRows.forEach((el, i) => { if (el && p >= svcAt[i]) el.classList.add('in'); });
-      if (p >= 0.82) s03Done = true;
+      if (p >= 0.82) {
+        document.getElementById('s03').classList.add('s03-complete');
+        s03Done = true;
+      }
     }
 
     let s01Done = false;
@@ -1315,6 +1324,7 @@
         if (s01CityB) s01CityB.style.transform = 'scaleY(1)';
         if (s01CityM) s01CityM.style.transform = 'scaleY(1)';
         if (s01CityF) s01CityF.style.transform = 'scaleY(1)';
+        document.getElementById('s01').classList.add('s01-complete');
         s01Done = true;
       }
     }
